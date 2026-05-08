@@ -29,8 +29,10 @@ for s = 1:numSubjectsToProcess
     
     eda_file = fullfile(subjectDir, 'EDA.csv');
     bvp_file = fullfile(subjectDir, 'BVP.csv');
+    temp_file = fullfile(subjectDir, 'TEMP.csv');
+    acc_file = fullfile(subjectDir, 'ACC.csv');
     
-    if ~isfile(eda_file) || ~isfile(bvp_file)
+    if ~isfile(eda_file) || ~isfile(bvp_file) || ~isfile(temp_file) || ~isfile(acc_file)
         continue; 
     end
     
@@ -39,6 +41,8 @@ for s = 1:numSubjectsToProcess
     % Caricamento Dati
     eda = readmatrix(eda_file);
     bvp = readmatrix(bvp_file);
+    temp = readmatrix(temp_file);
+    acc = readmatrix(acc_file);
     
     % Controllo di sicurezza (intestazioni)
     if length(eda) > 2 && eda(2) == fs_eda_orig
@@ -47,10 +51,20 @@ for s = 1:numSubjectsToProcess
     if length(bvp) > 2 && bvp(2) == fs_bvp
         bvp = bvp(3:end); 
     end
+    fs_temp_orig = 4;
+    if length(temp) > 2 && temp(2) == fs_temp_orig
+        temp = temp(3:end); 
+    end
+    fs_acc_orig = 32;
+    if size(acc, 1) > 2 && acc(2, 1) == fs_acc_orig
+        acc = acc(3:end, :); 
+    end
     
     % Rimozione eventuali NaN
     eda(isnan(eda)) = 0;
     bvp(isnan(bvp)) = 0;
+    temp(isnan(temp)) = 0;
+    acc(isnan(acc)) = 0;
     
     % Preprocessing EDA
     % Sovracampionamento da 4Hz a 64Hz per allineare i segnali
@@ -75,6 +89,22 @@ for s = 1:numSubjectsToProcess
     bvp_d1 = diff([bvp_clean(1); bvp_clean]) * fs_bvp;
     bvp_d2 = diff([bvp_d1(1); bvp_d1]) * fs_bvp;
     
+    % Preprocessing TEMP e ACC
+    % Resample a fs_bvp (64 Hz)
+    temp_resampled = resample(temp, fs_bvp, fs_temp_orig);
+    
+    % ACC magnitude e resampling
+    acc_mag = sqrt(acc(:,1).^2 + acc(:,2).^2 + acc(:,3).^2);
+    acc_resampled = resample(acc_mag, fs_bvp, fs_acc_orig);
+
+    % Filtro mediano (Non Lineare) per rimuovere artefatti spike impulsivi
+    temp_clean = medfilt1(temp_resampled, 15); 
+    acc_clean = medfilt1(acc_resampled, 15);
+
+    % Ulteriore filtro Low-Pass sulla TEMP essendo un segnale a lentissima variazione
+    [b_temp, a_temp] = butter(2, 0.1/(fs_bvp/2), 'low');
+    temp_clean = filtfilt(b_temp, a_temp, temp_clean);
+    
     % Segmentazione (Finestre da 60 secondi con overlap di 30)
     duration = floor(length(eda_resampled) / fs_eda);
 
@@ -86,13 +116,17 @@ for s = 1:numSubjectsToProcess
         startTimeSec = (w-1)*stepSize;
         idx = startTimeSec*fs_bvp + 1 : (startTimeSec + windowSize)*fs_bvp;
         
-        if max(idx) > length(bvp_clean), break; end
+        if max(idx) > length(bvp_clean) || max(idx) > length(temp_clean) || max(idx) > length(acc_clean)
+            break; 
+        end
         
         win_eda = eda_clean(idx);
         win_phasic = phasic(idx);
         win_bvp = bvp_clean(idx);
         win_bvp_d1 = bvp_d1(idx);
         win_bvp_d2 = bvp_d2(idx);
+        win_temp = temp_clean(idx);
+        win_acc = acc_clean(idx);
         
         % Estrazione Feature BVP
         % Rilevamento picchi sistolici (distanza minima 0.4s)
@@ -149,10 +183,20 @@ for s = 1:numSubjectsToProcess
             f_eda_amp = 0;
         end
         
-        % Vettore di Feature finale (13 features)
+        % Estrazione Feature Temperatura e Accelerometro
+        f_temp_mean = mean(win_temp);
+        f_temp_std = std(win_temp);
+        f_temp_slope_fit = polyfit(1:length(win_temp), win_temp', 1);
+        f_temp_slope = f_temp_slope_fit(1);
+        
+        f_acc_mean = mean(win_acc);
+        f_acc_std = std(win_acc);
+        
+        % Vettore di Feature finale
         feat_vector =[f_eda_mean, f_eda_std, f_eda_peaks, f_eda_amp, ...
                        f_bvp_std, f_bvp_d1_std, f_bvp_d2_std, ...
-                       f_bvp_mean_ppi, f_bvp_std_ppi, f_bvp_mean_hr, f_bvp_std_hr, f_bvp_sd2, f_bvp_rmssd];
+                       f_bvp_mean_ppi, f_bvp_std_ppi, f_bvp_mean_hr, f_bvp_std_hr, f_bvp_sd2, f_bvp_rmssd, ...
+                       f_temp_mean, f_temp_std, f_temp_slope, f_acc_mean, f_acc_std];
                    
         allFeatures = [allFeatures; feat_vector];
         
