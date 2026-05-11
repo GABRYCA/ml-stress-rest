@@ -71,17 +71,17 @@ for s = 1:numSubjectsToProcess
     fs_eda = fs_bvp; 
     eda_resampled = resample(eda, fs_eda, fs_eda_orig);
     
-    % Filtraggio Low-pass (passa-basso) (0.5-1 Hz) per rimuovere rumore ad alta frequenza
+    % Filtraggio Passa-Basso (0.5-1 Hz)
     [b_eda, a_eda] = butter(2, 1/(fs_eda/2), 'low');
     eda_clean = filtfilt(b_eda, a_eda, eda_resampled);
     
-    % Decomposizione Tonica/Fasica (0.05 Hz Low-pass)
+    % Decomposizione Tonica/Fasica (0.05 Hz Passa-Basso)
     [b_tonic, a_tonic] = butter(2, 0.05/(fs_eda/2), 'low');
     tonic = filtfilt(b_tonic, a_tonic, eda_clean);
     phasic = eda_clean - tonic;
     
-    % Preprocessing BVP
-    % Filtro Band-pass (passa-banda) 0.5-5 Hz
+    % Preprocessamento BVP
+    % Filtro Passa-Banda (0.5-5 Hz)
     [b_bvp, a_bvp] = butter(4, [0.5 5]/(fs_bvp/2), 'bandpass');
     bvp_clean = filtfilt(b_bvp, a_bvp, bvp);
     
@@ -89,23 +89,23 @@ for s = 1:numSubjectsToProcess
     bvp_d1 = diff([bvp_clean(1); bvp_clean]) * fs_bvp;
     bvp_d2 = diff([bvp_d1(1); bvp_d1]) * fs_bvp;
     
-    % Preprocessing TEMP e ACC
-    % Resample a fs_bvp (64 Hz)
+    % Preprocessamento TEMP e ACC
+    % Ricampionamento (resample) a fs_bvp (64 Hz)
     temp_resampled = resample(temp, fs_bvp, fs_temp_orig);
     
-    % ACC magnitude e resampling
+    % ACC magnitudine e ricampionamento
     acc_mag = sqrt(acc(:,1).^2 + acc(:,2).^2 + acc(:,3).^2);
     acc_resampled = resample(acc_mag, fs_bvp, fs_acc_orig);
 
-    % Filtro mediano (Non Lineare) per rimuovere artefatti spike impulsivi
+    % Filtro mediano (Non Lineare) per rimuovere artefatti e spike impulsivi
     temp_clean = medfilt1(temp_resampled, 15); 
     acc_clean = medfilt1(acc_resampled, 15);
 
-    % Ulteriore filtro Low-Pass sulla TEMP essendo un segnale a lentissima variazione
+    % Ulteriore filtro Passa-Basso sulla TEMP essendo un segnale a lentissima variazione
     [b_temp, a_temp] = butter(2, 0.1/(fs_bvp/2), 'low');
     temp_clean = filtfilt(b_temp, a_temp, temp_clean);
     
-    % Segmentazione (Finestre da 60 secondi con overlap di 30)
+    % Segmentazione (Finestre da 60 secondi con overlap di 30), ottengo la durata
     duration = floor(length(eda_resampled) / fs_eda);
 
     % Secondi tra una finestra e l'altra
@@ -137,15 +137,15 @@ for s = 1:numSubjectsToProcess
         f_bvp_std_hr = 0; f_bvp_sd2 = 0;
         
         if length(bvp_locs) > 2
-             % Intervalli Peak-to-Peak (picco-picco) (sec)
+             % Intervalli Picco-A-Picco (secondi)
             ppi = diff(bvp_locs) / fs_bvp;
             
-            % Scarto intervalli anomali (fuori dal range 400ms-1500ms)
+            % Scarto intervalli anomali (fuori range 400ms-1500ms)
             valid_ppi = ppi(ppi >= 0.4 & ppi <= 1.5);
             
-            % Se ci sono troppi artefatti (>20% anomalo), scarto il segmento
+            % Se ci sono troppi artefatti (>20%), scarto il segmento
             if length(valid_ppi) < 0.80 * length(ppi)
-                % Ho ancora i traumi Infor in Baan C di questa roba, fantastico tirocinio
+                % Ho ancora i traumi Infor in Baan C di questo, fantastico tirocinio
                 continue;
             end
             
