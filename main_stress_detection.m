@@ -9,8 +9,10 @@ clear; clc; close all;
 basePath = 'Dataset/EmpaticaE4Stress/EmpaticaE4Stress/Data_29_subjects/Subjects/';
 subjects = dir([basePath 'subject_*']);
 
-% Frequenze di campionamento note per Empatica E4
+% Frequenze originali di campionamento di Empatica E4 (EDA verrà ricampionato a 64 Hz da 4 Hz)
 fs_eda_orig = 4;
+fs_temp_orig = 4;
+fs_acc_orig = 32;
 fs_bvp = 64; 
 
 % Parametri per il windowing (segmentazione)
@@ -21,67 +23,80 @@ allFeatures = [];
 allLabels =[];
 
 %% Loop di Elaborazione Dati (Preprocessing e Feature Extraction)
+
+% Estraggo il numero di soggetti e lo scrivo in console
 numSubjectsToProcess = min(length(subjects), 29); 
 fprintf('Inizio dell''estrazione delle feature per %d soggetti...\n', numSubjectsToProcess);
 
+% Ciclo per tutti i soggetti ed elaboro i dati
 for s = 1:numSubjectsToProcess
+
+    % Apro la cartella del singolo soggetto
     subjectDir = fullfile(basePath, subjects(s).name, filesep);
     
+    % Prendo i file csv con i dati che ci interessano del soggetto
     eda_file = fullfile(subjectDir, 'EDA.csv');
     bvp_file = fullfile(subjectDir, 'BVP.csv');
     temp_file = fullfile(subjectDir, 'TEMP.csv');
     acc_file = fullfile(subjectDir, 'ACC.csv');
     
+    % Verifico che i file non siano nulli (in più)
     if ~isfile(eda_file) || ~isfile(bvp_file) || ~isfile(temp_file) || ~isfile(acc_file)
         continue; 
     end
     
+    % Comunico inizio dell'elaborazione in console del soggetto
     fprintf('Elaborazione del %s...\n', subjects(s).name);
     
-    % Caricamento Dati
+    % Carico i dati come matrice (alla fine i file CSV sono essenzialmente matrici con diverse righe e colonne)
+    % Rispettivamente:
+    % EDA è Electrodermal Activity (Attività elettrodermica)
+    % BVP è Blood Volume Pulse (Volume del pulso sanguigno)
+    % TEMP è Skin Temperature (Temperatura cutanea)
+    % ACC è Accelerometer (Accelerometro a 3 assi in questo caso)
     eda = readmatrix(eda_file);
     bvp = readmatrix(bvp_file);
     temp = readmatrix(temp_file);
     acc = readmatrix(acc_file);
     
-    % Controllo di sicurezza (intestazioni)
+    % Per sicuerzza, se un file come EDA contenesse dati di inizializzazione come timestamp e frequenze di campionamento, le facciamo saltare.
+    % Può essere utile in alcuni dataset.
+    % Nell'accelerometro, per esempio, la prima riga è la frequenza di campionmamento (32 HZ) e non ha senso elaborarla.
     if length(eda) > 2 && eda(2) == fs_eda_orig
         eda = eda(3:end); 
     end
     if length(bvp) > 2 && bvp(2) == fs_bvp
         bvp = bvp(3:end); 
     end
-    fs_temp_orig = 4;
     if length(temp) > 2 && temp(2) == fs_temp_orig
         temp = temp(3:end); 
     end
-    fs_acc_orig = 32;
     if size(acc, 1) > 2 && acc(2, 1) == fs_acc_orig
         acc = acc(3:end, :); 
     end
     
-    % Rimozione eventuali NaN
+    % Rimozione di eventuali NaN
     eda(isnan(eda)) = 0;
     bvp(isnan(bvp)) = 0;
     temp(isnan(temp)) = 0;
     acc(isnan(acc)) = 0;
     
-    % Preprocessing EDA
-    % Sovracampionamento da 4Hz a 64Hz per allineare i segnali
+    % Preprocessamento EDA
+    % Sovracampionamento da 4Hz a 64Hz per allineare i segnali (uso fs_bvp come frequenza da impostare, essendo già a 64 Hz)
     fs_eda = fs_bvp; 
     eda_resampled = resample(eda, fs_eda, fs_eda_orig);
     
-    % Filtraggio Passa-Basso (0.5-1 Hz)
+    % Filtro Passa-Basso (0.5-1 Hz) di secondo ordine
     [b_eda, a_eda] = butter(2, 1/(fs_eda/2), 'low');
     eda_clean = filtfilt(b_eda, a_eda, eda_resampled);
     
-    % Decomposizione Tonica/Fasica (0.05 Hz Passa-Basso)
+    % Decomposizione Tonica/Fasica (0.05 Hz Passa-Basso) con filtro di secondo ordine
     [b_tonic, a_tonic] = butter(2, 0.05/(fs_eda/2), 'low');
     tonic = filtfilt(b_tonic, a_tonic, eda_clean);
     phasic = eda_clean - tonic;
     
     % Preprocessamento BVP
-    % Filtro Passa-Banda (0.5-5 Hz)
+    % Filtro Passa-Banda (0.5-5 Hz) di quarto ordine
     [b_bvp, a_bvp] = butter(4, [0.5 5]/(fs_bvp/2), 'bandpass');
     bvp_clean = filtfilt(b_bvp, a_bvp, bvp);
     
@@ -112,10 +127,13 @@ for s = 1:numSubjectsToProcess
     stepSize = 30;
     numWindows = floor((duration - windowSize) / stepSize) + 1;
     
+    % Ciclo per ogni segmento/finestra
     for w = 1:numWindows
+        % Traccio il tempo
         startTimeSec = (w-1)*stepSize;
         idx = startTimeSec*fs_bvp + 1 : (startTimeSec + windowSize)*fs_bvp;
         
+        % Verifico che l'indice non superi la lunghezza (può succedere nell'ultima finestra)
         if max(idx) > length(bvp_clean) || max(idx) > length(temp_clean) || max(idx) > length(acc_clean)
             break; 
         end
@@ -129,10 +147,10 @@ for s = 1:numSubjectsToProcess
         win_acc = acc_clean(idx);
         
         % Estrazione Feature BVP
-        % Rilevamento picchi sistolici (distanza minima 0.4s)
+        % Rilevamento picchi sistolici (distanza minima 0.4 secondi)
         [~, bvp_locs] = findpeaks(win_bvp, 'MinPeakDistance', 0.4*fs_bvp);
         
-        % Inizializzazione a 0
+        % Inizializzo tutto a 0
         f_bvp_mean_ppi = 0; f_bvp_std_ppi = 0; f_bvp_mean_hr = 0; 
         f_bvp_std_hr = 0; f_bvp_sd2 = 0;
         
@@ -140,7 +158,7 @@ for s = 1:numSubjectsToProcess
              % Intervalli Picco-A-Picco (secondi)
             ppi = diff(bvp_locs) / fs_bvp;
             
-            % Scarto intervalli anomali (fuori range 400ms-1500ms)
+            % Scarto intervalli anomali (fuori dal range di 400ms-1500ms)
             valid_ppi = ppi(ppi >= 0.4 & ppi <= 1.5);
             
             % Se ci sono troppi artefatti (>20%), scarto il segmento
