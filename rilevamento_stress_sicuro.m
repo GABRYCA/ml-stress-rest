@@ -2,7 +2,7 @@
 % Rilevazione dello Stress (Empatica E4) di G.C.
 % Esame di Interfacce Uomo-Macchina
 % Versione sperimentale, attualmente differenzia dal main in:
-% - Passo = 60 per rispettare il paper ed evitare confronti errati (il KFold casuale non va bene)
+% - Passo = 60 per rispettare il paper ed evitare confronti errati (il KFold casuale non va bene in quanto crea data-leakage con passi di lunghezza diverse)
 % =========================================================================
 
 clear; clc; close all;

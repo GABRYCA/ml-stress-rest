@@ -1,8 +1,7 @@
 % =========================================================================
 % Rilevazione dello Stress (Empatica E4) di G.C.
 % Esame di Interfacce Uomo-Macchina
-% Versione sicura, attualmente differenzia dal main in:
-% - Passo = 60 per rispettare il paper ed evitare confronti errati (il KFold casuale non va bene con finestre sovrapposte in quanto casuale)
+% Questo è la versione sperimentale.
 % =========================================================================
 
 clear; clc; close all;
@@ -22,7 +21,8 @@ fs_bvp = 64;
 dimensioneFinestra = 60;
 
 featureTotali = [];
-labelTotali =[];
+labelTotali = [];
+subjectTotali = [];
 
 %% Loop di Elaborazione Dati (Preprocessing e Feature Extraction)
 
@@ -126,7 +126,7 @@ for s = 1:numSoggettiDaElaborare
     durata = floor(length(eda_ricampionato) / fs_eda);
 
     % Secondi tra una finestra e l'altra
-    passo = 60;
+    passo = 30;
     numFinestre = floor((durata - dimensioneFinestra) / passo) + 1;
     
     % Ciclo per ogni segmento/finestra
@@ -248,6 +248,7 @@ for s = 1:numSoggettiDaElaborare
             % 0 = Baseline (Rest)
             labelTotali = [labelTotali; 0];
         end
+        subjectTotali = [subjectTotali; s];
     end
 end
 
@@ -256,43 +257,63 @@ if isempty(featureTotali)
 end
 
 %% Machine Learning e Classificazione
-fprintf('\nAddestramento dei classificatori con 10-Fold Cross-Validation...\n');
+fprintf('\nAddestramento dei classificatori con Leave-One-Subject-Out (LOSO) Cross-Validation...\n');
 
-% Standardizzazione Z-score (Per comparare le scale)
-featureTotali = zscore(featureTotali);
+% Standardizzazione Z-score (Intra-soggetto per gestire le differenze fisiologiche)
+featureTotaliNorm = zeros(size(featureTotali));
+soggetti_unici = unique(subjectTotali);
+for i = 1:length(soggetti_unici)
+    idx = (subjectTotali == soggetti_unici(i));
+    featureTotaliNorm(idx, :) = zscore(featureTotali(idx, :));
+end
+featureTotali = featureTotaliNorm;
 
-% Verifica presenza di sufficienti esempi di entrambe le classi per il K-Fold
+% Verifica presenza di sufficienti label di entrambe le classi
 label_uniche = unique(labelTotali);
 if length(label_uniche) < 2
     error('Errore: I dati contengono solo 1 classe. Impossibile addestrare il classificatore.');
 end
 
-% Preparazione CV (10 Fold)
-cv = cvpartition(labelTotali, 'KFold', 10);
+% Selezione delle Features con Neighborhood Component Analysis (NCA)
+fprintf('\nSelezione delle features con NCA...\n');
+nca = fscnca(featureTotali, labelTotali, 'Standardize', true, 'Solver', 'sgd', 'Verbose', 0);
+tolleranzaPesi = 0.5;
+featureSelezionate = nca.FeatureWeights > tolleranzaPesi;
+featureTotali = featureTotali(:, featureSelezionate);
+fprintf('Mantenute %d features su %d totali.\n', sum(featureSelezionate), length(featureSelezionate));
+
+% Preparazione CV (LOSO)
+soggetti_unici = unique(subjectTotali);
+numSoggettiFin = length(soggetti_unici);
+
 predizioniRF = zeros(size(labelTotali));
 predizioniSVM = zeros(size(labelTotali));
 
 % Setup Alberi per l'Ensamble Random Forest
 t = templateTree('MaxNumSplits', 500, 'MinLeafSize', 5);
 
-for i = 1:cv.NumTestSets
-    indiciTrain = cv.training(i);
-    indiciTest = cv.test(i);
+for i = 1:numSoggettiFin
+    soggettoTest = soggetti_unici(i);
+    
+    indiciTest = (subjectTotali == soggettoTest);
+    indiciTrain = ~indiciTest;
     
     Xtrain = featureTotali(indiciTrain, :);
     Ytrain = labelTotali(indiciTrain, :);
     Xtest = featureTotali(indiciTest, :);
     
-    % Random Forest (RUSBoost per bilanciare il dataset in automatico)
-    modelloRF = fitcensemble(Xtrain, Ytrain, 'Method', 'RUSBoost', ...
-        'NumLearningCycles', 100, 'Learners', t, 'LearnRate', 0.1);
+    % Random Forest (con pesi bilanciati)
+    modelloRF = fitcensemble(Xtrain, Ytrain, 'Method', 'GentleBoost', ...
+        'NumLearningCycles', 150, 'Learners', t, 'LearnRate', 0.1);
     predizioniRF(indiciTest) = predict(modelloRF, Xtest);
     
-    % SVM (Kernel RBF Radial Basis Function, migliora i risultati per segnali fisiologici)
-    modelloSVM = fitcsvm(Xtrain, Ytrain, 'KernelFunction', 'rbf', ...
-        'BoxConstraint', 10, 'Standardize', false, 'KernelScale', 'auto');
+    % SVM (Linear Kernel, meglio su molte features standardizzate)
+    modelloSVM = fitcsvm(Xtrain, Ytrain, 'KernelFunction', 'linear', ...
+        'BoxConstraint', 1, 'Standardize', false);
     predizioniSVM(indiciTest) = predict(modelloSVM, Xtest);
 end
+
+
 
 %% Valutazione e Metriche di Performance
 accRF = sum(predizioniRF == labelTotali) / length(labelTotali);
@@ -303,17 +324,17 @@ matriceConfRF = confusionmat(labelTotali, predizioniRF);
 tn = matriceConfRF(1,1); fp = matriceConfRF(1,2);
 fn = matriceConfRF(2,1); tp = matriceConfRF(2,2);
 
-precision = tp / (tp + fp);
+precisione = tp / (tp + fp);
 recall = tp / (tp + fn);
-f1_score = 2 * (precision * recall) / (precision + recall);
+f1_score = 2 * (precisione * recall) / (precisione + recall);
 
 fprintf('\n=== RISULTATI MODELLI ===\n');
 fprintf('Distribuzione Classi: %d Rest (0), %d Stress (1)\n', sum(labelTotali==0), sum(labelTotali==1));
-fprintf('Accuratezza Random Forest (RUSBoost): %.2f%%\n', accRF * 100);
+fprintf('Accuratezza Random Forest (GentleBoost): %.2f%%\n', accRF * 100);
 fprintf('Accuratezza SVM (Cubica): %.2f%%\n', accSVM * 100);
 
 fprintf('\n=== METRICHE DETTAGLIATE (Random Forest) ===\n');
-fprintf('Precision (Stress): %.2f\n', precision);
+fprintf('Precision (Stress): %.2f\n', precisione);
 fprintf('Recall (Stress): %.2f\n', recall);
 fprintf('F1-Score: %.2f\n', f1_score);
 
@@ -322,7 +343,7 @@ figure('Name', 'Analisi delle Performance', 'Color', 'w', 'Position',[100 100 90
 
 subplot(1,2,1);
 confusionchart(labelTotali, predizioniRF, 'RowSummary','row-normalized', 'ColumnSummary','column-normalized');
-title('Matrice Confusione - RF (RUSBoost)');
+title('Matrice Confusione - RF (GentleBoost)');
 
 subplot(1,2,2);
 confusionchart(labelTotali, predizioniSVM, 'RowSummary','row-normalized', 'ColumnSummary','column-normalized');
