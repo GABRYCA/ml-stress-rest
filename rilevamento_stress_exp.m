@@ -307,13 +307,11 @@ for i = 1:numSoggettiFin
         'NumLearningCycles', 150, 'Learners', t, 'LearnRate', 0.1);
     predizioniRF(indiciTest) = predict(modelloRF, Xtest);
     
-    % SVM (Linear Kernel, meglio su molte features standardizzate)
+    % SVM (Kernel Lineare, meglio su molte features standardizzate)
     modelloSVM = fitcsvm(Xtrain, Ytrain, 'KernelFunction', 'linear', ...
         'BoxConstraint', 1, 'Standardize', false);
     predizioniSVM(indiciTest) = predict(modelloSVM, Xtest);
 end
-
-
 
 %% Valutazione e Metriche di Performance
 accRF = sum(predizioniRF == labelTotali) / length(labelTotali);
@@ -331,7 +329,7 @@ f1_score = 2 * (precisione * recall) / (precisione + recall);
 fprintf('\n=== RISULTATI MODELLI ===\n');
 fprintf('Distribuzione Classi: %d Rest (0), %d Stress (1)\n', sum(labelTotali==0), sum(labelTotali==1));
 fprintf('Accuratezza Random Forest (GentleBoost): %.2f%%\n', accRF * 100);
-fprintf('Accuratezza SVM (Cubica): %.2f%%\n', accSVM * 100);
+fprintf('Accuratezza SVM (Lineare): %.2f%%\n', accSVM * 100);
 
 fprintf('\n=== METRICHE DETTAGLIATE (Random Forest) ===\n');
 fprintf('Precision (Stress): %.2f\n', precisione);
@@ -347,7 +345,7 @@ title('Matrice Confusione - RF (GentleBoost)');
 
 subplot(1,2,2);
 confusionchart(labelTotali, predizioniSVM, 'RowSummary','row-normalized', 'ColumnSummary','column-normalized');
-title('Matrice Confusione - SVM (Cubica)');
+title('Matrice Confusione - SVM (Lineare)');
 
 save('processed_data.mat', 'featureTotali', 'labelTotali');
 fprintf('\nDati salvati in "processed_data.mat".\n');
