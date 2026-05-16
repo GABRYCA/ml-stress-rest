@@ -13,7 +13,7 @@ soggetti = dir([basePath 'subject_*']);
 fs_eda_orig = 4;
 fs_temp_orig = 4;
 fs_acc_orig = 32;
-fs_bvp = 64; 
+fs_bvp = 64;
 
 % Parametri per il windowing (segmentazione)
 % Finestre da 60 secondi
@@ -181,7 +181,7 @@ for s = 1:numSoggettiDaElaborare
             continue; 
         end
         
-        % Feature Statistiche BVP
+        % Feature BVP
         f_bvp_devstd = std(fin_bvp);
         f_bvp_d1_devstd = std(fin_bvp_d1);
         f_bvp_d2_devstd = std(fin_bvp_d2);
@@ -194,8 +194,11 @@ for s = 1:numSoggettiDaElaborare
         [picchi_eda, ~] = findpeaks(fin_fasica, 'MinPeakDistance', fs_eda);
         picchi_eda = picchi_eda(picchi_eda > 0.01);
         
+        % Con il numero di elementi dei picchi, se presenti, calcolo
+        % la media
         f_eda_picchi = length(picchi_eda);
         if f_eda_picchi > 0
+            % Calcolo la media per trovare l'ampiezza dai picchi
             f_eda_ampiezza = mean(picchi_eda); 
         else
             f_eda_ampiezza = 0;
@@ -224,7 +227,8 @@ for s = 1:numSoggettiDaElaborare
         tempoCorrente = tempoMedio;
         eStress = false;
         
-        % Task temporizzati basati sul paper (Rest/riposo di 3 minuti, poi Task e Rest alternati)
+        % Task temporizzati basati sul paper (Rest/riposo di 3 minuti, poi
+        % Task e Rest alternati)
         if (tempoCorrente > 3 && tempoCorrente <= 13) || ...  % Task 1 
            (tempoCorrente > 15 && tempoCorrente <= 20) || ... % Task 2 
            (tempoCorrente > 22 && tempoCorrente <= 25) || ... % Task 3 
@@ -244,7 +248,7 @@ for s = 1:numSoggettiDaElaborare
 end
 
 if isempty(featureTotali)
-    error('Nessuna feature estratta! Controlla i percorsi dei file e i dati.');
+    error('Nessuna feature estratta! Controllare i percorsi dei file e i dati.');
 end
 
 %% Machine Learning e Classificazione
