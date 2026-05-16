@@ -1,4 +1,4 @@
-% Grafico segnali prima e dopo i filtri
+% Pulisco la console
 clear; clc; close all;
 
 % Percorso file
@@ -24,6 +24,7 @@ fs_eda_orig = 4;
 fs_temp_orig = 4;
 fs_acc_orig = 32;
 fs_bvp = 64;
+fs_target = fs_bvp;
 
 % Caricamento
 eda_orig = readmatrix(file_eda);
@@ -31,7 +32,7 @@ bvp_orig = readmatrix(file_bvp);
 temp_orig = readmatrix(file_temp);
 acc_orig = readmatrix(file_acc);
 
-% Pulizia dati iniziali
+% Aggiustamenti soliti
 if length(eda_orig) > 2 && eda_orig(2) == fs_eda_orig
     eda_orig = eda_orig(3:end); 
 end
@@ -45,109 +46,122 @@ if size(acc_orig, 1) > 2 && acc_orig(2, 1) == fs_acc_orig
     acc_orig = acc_orig(3:end, :); 
 end
 
-% Rimozione eventuali NaN
+% Rimozione NaN
 eda_orig(isnan(eda_orig)) = 0;
 bvp_orig(isnan(bvp_orig)) = 0;
 temp_orig(isnan(temp_orig)) = 0;
 acc_orig(isnan(acc_orig)) = 0;
 
-fs_target = fs_bvp;
-
 %% EDA
 eda_ricampionato = resample(eda_orig, fs_target, fs_eda_orig);
-
-% Filtro Low-pass (1 Hz)
 [b_eda, a_eda] = butter(2, 1/(fs_target/2), 'low');
-eda_filtrato = filtfilt(b_eda, a_eda, eda_ricampionato);
+eda_pulito = filtfilt(b_eda, a_eda, eda_ricampionato);
 
-% Decomposizione Tonica/Fasica (0.05 Hz)
 [b_tonico, a_tonico] = butter(2, 0.05/(fs_target/2), 'low');
-eda_tonico = filtfilt(b_tonico, a_tonico, eda_filtrato);
-eda_fasico = eda_filtrato - eda_tonico;
+eda_tonico = filtfilt(b_tonico, a_tonico, eda_pulito);
+eda_fasico = eda_pulito - eda_tonico;
 
 %% BVP
-% Filtro Passa-Banda (0.5-5 Hz)
-[b_bvp, a_bvp] = butter(4, [0.5 5]/(fs_bvp/2), 'bandpass');
-bvp_filtrato = filtfilt(b_bvp, a_bvp, bvp_orig);
+[b_bvp, a_bvp] = butter(4, [0.5 5]/(fs_target/2), 'bandpass');
+bvp_pulito = filtfilt(b_bvp, a_bvp, bvp_orig);
+
+% Derivate
+bvp_d1 = diff([bvp_pulito(1); bvp_pulito]) * fs_target;
+bvp_d2 = diff([bvp_d1(1); bvp_d1]) * fs_target;
 
 %% TEMP
-temp_ricampionato = resample(temp_orig, fs_target, fs_temp_orig);
-temp_med = medfilt1(temp_ricampionato, 15);
-
-% Filtro Low-pass (0.1 Hz)
+temp_ricampionata = resample(temp_orig, fs_target, fs_temp_orig);
+temp_med = medfilt1(temp_ricampionata, 15);
 [b_temp, a_temp] = butter(2, 0.1/(fs_target/2), 'low');
-temp_filtrato = filtfilt(b_temp, a_temp, temp_med);
+temp_pulita = filtfilt(b_temp, a_temp, temp_med);
 
-%% Processing ACC
-acc_mag = sqrt(acc_orig(:,1).^2 + acc_orig(:,2).^2 + acc_orig(:,3).^2);
-acc_ricampionato = resample(acc_mag, fs_target, fs_acc_orig);
-acc_filtrato = medfilt1(acc_ricampionato, 15);
+%% ACC
+acc_magnitudo = sqrt(acc_orig(:,1).^2 + acc_orig(:,2).^2 + acc_orig(:,3).^2);
+acc_ricampionato = resample(acc_magnitudo, fs_target, fs_acc_orig);
+acc_pulito = medfilt1(acc_ricampionato, 15);
 
-%% Visualizzazione
-% Definizione dei vettori temporali per il plotting
+%% Vettori Temporali per la visualizzazione
 t_eda_orig = (0:length(eda_orig)-1) / fs_eda_orig;
 t_eda_ricampionato = (0:length(eda_ricampionato)-1) / fs_target;
 
 t_bvp_orig = (0:length(bvp_orig)-1) / fs_bvp;
 
 t_temp_orig = (0:length(temp_orig)-1) / fs_temp_orig;
-t_temp_ricampionato = (0:length(temp_ricampionato)-1) / fs_target;
+t_temp_ricampionato = (0:length(temp_ricampionata)-1) / fs_target;
 
-t_acc_orig = (0:length(acc_mag)-1) / fs_acc_orig;
+t_acc_orig = (0:length(acc_orig)-1) / fs_acc_orig;
 t_acc_ricampionato = (0:length(acc_ricampionato)-1) / fs_target;
 
-% Plot EDA
-figure('Name', 'Segnale EDA prima e dopo il Filtraggio', 'NumberTitle', 'off');
-subplot(3, 1, 1);
-plot(t_eda_orig, eda_orig);
-title('EDA Originale');
-xlabel('Tempo (s)'); ylabel('Ampiezza');
+%% Visualizzazione 
+% Limiti per mostrare meglio i dettagli dei filtri
+x_lim_bvp = [300, 320];
 
-subplot(3, 1, 2);
-plot(t_eda_ricampionato, eda_ricampionato);
-title('EDA Ricampionato (64Hz)');
-xlabel('Tempo (s)'); ylabel('Ampiezza');
+figure('Name', 'Effetti del Preprocessing sui Segnali (Prima e Dopo)', 'NumberTitle', 'off', 'Position', [100 100 1200 800]);
 
-subplot(3, 1, 3);
-plot(t_eda_ricampionato, eda_filtrato, 'b'); hold on;
-plot(t_eda_ricampionato, eda_tonico, 'r', 'LineWidth', 1.5);
-plot(t_eda_ricampionato, eda_fasico, 'g');
-legend('EDA Filtrato', 'Tonico', 'Fasico');
-title('EDA Filtrato e Componenti Tonico/Fasico');
-xlabel('Tempo (s)'); ylabel('Ampiezza');
+% EDA Plot
+subplot(4, 2, 1);
+plot(t_eda_orig, eda_orig, 'Color', [0.7 0.7 0.7]); hold on;
+plot(t_eda_ricampionato, eda_pulito, 'b', 'LineWidth', 1.5);
+title('EDA: Grezzo vs Elaborato (Passa-Basso)');
+legend('Grezzo (4Hz)', 'Pulito (64Hz)');
+xlabel('Tempo (s)'); ylabel('\muS');
+xlim([0 t_eda_orig(end)]);
 
-% Plot BVP
-figure('Name', 'Segnale BVP prima e dopo il Filtraggio', 'NumberTitle', 'off');
-subplot(2, 1, 1);
-plot(t_bvp_orig, bvp_orig);
-title('BVP Originale');
-xlabel('Tempo (s)'); ylabel('Ampiezza');
+subplot(4, 2, 2);
+plot(t_eda_ricampionato, eda_tonico, 'r', 'LineWidth', 1.5); hold on;
+plot(t_eda_ricampionato, eda_fasico, 'g', 'LineWidth', 1.2);
+title('EDA: Componente Tonica e Fasica');
+legend('Tonica', 'Fasica');
+xlabel('Tempo (s)'); ylabel('\muS');
+xlim([0 t_eda_orig(end)]);
 
-subplot(2, 1, 2);
-plot(t_bvp_orig, bvp_filtrato);
-title('BVP Filtrato Passa-Banda');
+% BVP Plot
+subplot(4, 2, 3);
+plot(t_bvp_orig, bvp_orig, 'Color', [0.7 0.7 0.7]); hold on;
+plot(t_bvp_orig, bvp_pulito, 'b', 'LineWidth', 1.2);
+title('BVP: Grezzo vs Elaborato (Passa-Banda)');
+legend('Grezzo', 'Filtrato');
 xlabel('Tempo (s)'); ylabel('Ampiezza');
+xlim(x_lim_bvp);
 
-% Plot TEMP
-figure('Name', 'Segnale TEMP prima e dopo il Filtraggio', 'NumberTitle', 'off');
-subplot(2, 1, 1);
-plot(t_temp_orig, temp_orig);
-title('TEMP Originale');
+subplot(4, 2, 4);
+plot(t_bvp_orig, bvp_pulito, 'b'); hold on;
+plot(t_bvp_orig, bvp_d1/max(abs(bvp_d1))*max(bvp_pulito), 'r--');
+title('BVP: Segnale Pulito e sua Derivata (Normalizzata)');
+legend('BVP Pulito', 'Derivata (1a)');
 xlabel('Tempo (s)'); ylabel('Ampiezza');
+xlim(x_lim_bvp);
 
-subplot(2, 1, 2);
-plot(t_temp_ricampionato, temp_filtrato);
-title('TEMP Ricampionato e Filtrato');
-xlabel('Tempo (s)'); ylabel('Ampiezza');
+% TEMP Plot
+subplot(4, 2, 5);
+plot(t_temp_orig, temp_orig, 'Color', [0.7 0.7 0.7]); hold on;
+plot(t_temp_ricampionato, temp_pulita, 'r', 'LineWidth', 1.5);
+title('TEMP: Grezzo vs Elaborato (Mediano + Passa-Basso)');
+legend('Grezzo (4Hz)', 'Pulito (64Hz)');
+xlabel('Tempo (s)'); ylabel('°C');
+xlim([0 t_temp_orig(end)]);
 
-% Plot ACC
-figure('Name', 'Segnale ACC prima e dopo il filtraggio', 'NumberTitle', 'off');
-subplot(2, 1, 1);
-plot(t_acc_orig, acc_mag);
-title('ACC Originale (Magnitude)');
-xlabel('Tempo (s)'); ylabel('Ampiezza');
+subplot(4, 2, 6);
+plot(t_temp_orig, temp_orig, 'Color', [0.7 0.7 0.7]); hold on;
+plot(t_temp_ricampionato, temp_pulita, 'r', 'LineWidth', 1.5);
+title('TEMP: Dettaglio dell''effetto filtro (Zoom su variazioni)');
+xlabel('Tempo (s)'); ylabel('°C');
+xlim([400, 1000]);
 
-subplot(2, 1, 2);
-plot(t_acc_ricampionato, acc_filtrato);
-title('ACC Ricampionato e con Filtro Mediano (Magnitude)');
-xlabel('Tempo (s)'); ylabel('Ampiezza');
+% ACC Plot
+subplot(4, 2, 7);
+plot(t_acc_orig, acc_magnitudo, 'Color', [0.7 0.7 0.7]); hold on;
+plot(t_acc_ricampionato, acc_pulito, 'k', 'LineWidth', 1.2);
+title('ACC: Magnitudo Grezza vs Filtrata (Filtro Mediano)');
+legend('Grezzo (32Hz)', 'Pulito (64Hz)');
+xlabel('Tempo (s)'); ylabel('g');
+xlim([0 t_acc_orig(end)]);
+
+subplot(4, 2, 8);
+plot(t_acc_orig, acc_magnitudo, 'Color', [0.7 0.7 0.7]); hold on;
+plot(t_acc_ricampionato, acc_pulito, 'k', 'LineWidth', 1.2);
+title('ACC: Dettaglio Artefatti rimossi (Zoom)');
+xlabel('Tempo (s)'); ylabel('g');
+xlim([300, 350]);
+
+sgtitle('Fase di Preprocessing del Segnale: Da Grezzo alle Feature ML');
