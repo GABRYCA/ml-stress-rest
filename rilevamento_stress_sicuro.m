@@ -122,7 +122,7 @@ for s = 1:numSoggettiDaElaborare
     [b_temp, a_temp] = butter(2, 0.1/(fs_bvp/2), 'low');
     temp_pulita = filtfilt(b_temp, a_temp, temp_pulita);
     
-    % Segmentazione (Finestre da 60 secondi con overlap di 30), ottengo la durata
+    % Segmentazione (Finestre da 60 secondi), ottengo la durata
     durata = floor(length(eda_ricampionato) / fs_eda);
 
     % Secondi tra una finestra e l'altra
@@ -194,7 +194,7 @@ for s = 1:numSoggettiDaElaborare
         f_eda_media = mean(fin_eda);
         f_eda_devstd = std(fin_eda);
         
-        % Rilevamento picchi EDA (Skin Conductance Responses SCR) sulla fasica
+        % Rilevamento picchi EDA (Skin Conductance Responses SCR) su fasica
         [picchi_eda, ~] = findpeaks(fin_fasica, 'MinPeakDistance', fs_eda);
         picchi_eda = picchi_eda(picchi_eda > 0.01);
         
@@ -318,7 +318,7 @@ fprintf('Recall (Stress): %.2f\n', recall);
 fprintf('F1-Score: %.2f\n', f1_score);
 
 % Matrici di Confusione
-figure('Name', 'Analisi delle Performance', 'Color', 'w', 'Position',[100 100 900 400]);
+figure('Name', 'Analisi delle Performance', 'Color', 'w', 'Position', [100 100 900 400]);
 
 subplot(1,2,1);
 confusionchart(labelTotali, predizioniRF, 'RowSummary','row-normalized', 'ColumnSummary','column-normalized');
