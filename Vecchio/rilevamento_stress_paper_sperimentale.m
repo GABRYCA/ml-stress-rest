@@ -12,8 +12,8 @@ soggetti = dir([basePath 'subject_*']);
 % Frequenze di campionamento secondo Empatica E4
 fs_eda_orig = 4;
 fs_bvp = 64;
-fs_temp = 4; % Temp ècampionata a 4Hz
-fs_hr = 1; % HR è campionata a 1Hz
+fs_temp = 4;
+fs_hr = 1;
 
 % Parametri per il windowing (segmentazione)
 dimensioneFinestra = 60;
