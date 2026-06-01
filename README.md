@@ -24,7 +24,7 @@ Matlab, con:
 - Creare una cartella "Dataset" ed Estrarlo al suo interno, alla fine la struttura dovrebbe essere la seguente (si, doppia cartella empatica una dentro l'altra):
 (Dataset/EmpaticaE4Stress/EmpaticaE4Stress/Data_29_subjects/Subjects/...).
 
-Come IDE il progetto prevede che sia installato Matlab con i pacchetti menzionati all'inizio in Esecuzione, ossia:
+Come IDE il progetto prevede che sia installato Matlab con i pacchetti menzionati all'inizio in "Esecuzione", ossia:
 - Signal Processing Toolbox
 - Statistics and Machine Learning Toolbox
 - Wavelet Toolbox
@@ -32,9 +32,10 @@ Come IDE il progetto prevede che sia installato Matlab con i pacchetti menzionat
 
 Inoltre, non fa male VSCode, con estensione Matlab installata (non Matlab Unofficial, quella è deprecata), così da poter compilare con il triangolo in alto a destra.
 In alternativa, direttamente dalla cartella del progetto, si può eseguire il codice e creare il modello con il comando:
-- matlab -batch "main_stress_detection"
-
-Dovrebbe creare il modello, generare in automatico una matrice di confusione e dei log in console, oltre ad un file processed_data.mat.
+- matlab -batch "rilevamento_stress_paper_baseline_confronto"
+oppure:
+- matlab -batch "rilevamento_stress_paper_baseline_sperimentale"
+- matlab -batch "rilevamento_stress_paper_baseline_baseline"
 
 ## Presentazione Powerpoint
 C'è una versione Work-In-Progress della presentazione direttamente nella root del progetto, si chiama:
