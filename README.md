@@ -1,47 +1,53 @@
 ## Esame di Interfacce Uomo-Macchina
 
-Paper scelto: PPG and EDA dataset collected with Empatica E4 for stress assessment (dataset_ppg_eda_stress_datainbrief2024.pdf).
+### Autore: 
+[G.C.](https://www.linkedin.com/in/gabriele-caretti-046408270/) - presso l'Università degli Studi dell'Insubria, Varese, 2025-2026.
+
+### Fonti
+Basato sul Paper:
+[PPG and EDA dataset collected with Empatica E4 for stress assessment](https://doi.org/10.1016/j.dib.2024.110102).
 
 Paper di supporto:
-A Method for Stress Detection Using Empatica E4 Bracelet and
-Machine-Learning Techniques (Empatica_dataset_stress_Sensors2024.pdf).
+[A Method for Stress Detection Using Empatica E4 Bracelet and
+Machine-Learning Techniques](https://www.mdpi.com/2220710).
 
-Link al dataset: https://data.mendeley.com/datasets/kb42z77m2g/2 (Scaricato nella cartella Dataset)
-Il Dataset non dovrebbe finire su git come da .gitignore (si spera).
+Dataset Link: https://data.mendeley.com/datasets/kb42z77m2g/2 (Scaricato nella cartella Dataset)
 
-Esecuzione: 
+## Esecuzione: 
 Matlab, con:
 - Signal Processing Toolbox
 - Statistics and Machine Learning Toolbox
 - Wavelet Toolbox
 - Optimization Toolbox
-- Deep Learning Toolbox (Forse sono un po' ambizioso, GC)
 
 ## Installazione ed Esecuzione
 
 ### SETUP:
 - Scaricare il Dataset da https://data.mendeley.com/datasets/kb42z77m2g/2
-- Creare una cartella "Dataset" ed Estrarlo al suo interno, alla fine la struttura dovrebbe essere la seguente (si, doppia cartella empatica una dentro l'altra):
-(Dataset/EmpaticaE4Stress/EmpaticaE4Stress/Data_29_subjects/Subjects/...).
+- Creare una cartella "Dataset" ed estraetelo al suo interno, alla fine la struttura dovrebbe essere la seguente:
+(`Dataset/EmpaticaE4Stress/EmpaticaE4Stress/Data_29_subjects/Subjects/...`).
 
-Come IDE il progetto prevede che sia installato Matlab con i pacchetti menzionati all'inizio in "Esecuzione", ossia:
+Come IDE il progetto prevede che sia installato Matlab r2026a (o superiore) con i pacchetti:
 - Signal Processing Toolbox
 - Statistics and Machine Learning Toolbox
 - Wavelet Toolbox
 - Optimization Toolbox
 
-Inoltre, non fa male VSCode, con estensione Matlab installata (non Matlab Unofficial, quella è deprecata), così da poter compilare con il triangolo in alto a destra.
-In alternativa, direttamente dalla cartella del progetto, si può eseguire il codice e creare il modello con il comando:
-- matlab -batch "rilevamento_stress_paper_baseline_confronto"
-oppure:
-- matlab -batch "rilevamento_stress_paper_baseline_sperimentale"
-- matlab -batch "rilevamento_stress_paper_baseline_baseline"
+Inoltre, è stato utilizzato **VSCode** con estensione **Matlab** (non Matlab Unofficial, ma quella ufficiale).
+
+Matlab r2026a supporta l'esecuzione di tutti i file `.m` del progetto.
+
+In alternativa, si può eseguire il codice e creare il modello con i comandi:
+- `matlab -batch "rilevamento_stress_paper_baseline_confronto"`
+- `matlab -batch "rilevamento_stress_paper_baseline_sperimentale"`
+- `matlab -batch "rilevamento_stress_paper_baseline_baseline"`
 
 ## Presentazione Powerpoint
-C'è una versione Work-In-Progress della presentazione direttamente nella root del progetto, si chiama:
 - Progetto Interfacce Uomo-Macchina.pptx.
 
-Vi chiedo di fare attenzione a quello che modificate, salvate sempre e fate molte commit (così i rollback sono più semplici, in caso di errori).
-
+## LICENSE:
+- Dataset: CC BY 4.0 [Source](https://data.mendeley.com/datasets/kb42z77m2g/2)
+- Paper 1: CC BY 4.0 [Source](https://doi.org/10.1016/j.dib.2024.110102)
+- Paper 2: CC BY 4.0 [Source](https://www.mdpi.com/2220710)
 
 
